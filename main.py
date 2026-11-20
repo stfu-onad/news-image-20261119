@@ -1,20 +1,29 @@
-"""THE WORLD TODAY — Thursday 19 November 2026.
+"""THE WORLD TODAY — Thursday 19 November 2026 (v2, FINAL EDITION).
 
-Front page of a one-page newspaper image (entry.png, 1024x1024 JPEG).
+Front page of a one-page newspaper image (entry.png, 1024x1024 JPEG),
+revised after the day's news was complete. Five stories, each verified
+against reporting of 19 November 2026:
 
-Lead story: TRUMP, XI AND PUTIN MEET IN SHENZHEN — a trilateral summit
-held today in Shenzhen, including a Trump-Putin one-on-one, the first
-since Alaska 2025.
+Lead: TRUMP, XI AND PUTIN SIGN 'DECLARATION TOWARDS PEACE' — the
+trilateral summit in Shenzhen ends with a four-point pact on UN reform,
+oil output, ICC limits and nuclear risk; no deal on Ukraine or Gaza.
 
-Second row: VICE CITY OPENS WORLDWIDE — GTA VI launches globally,
-scoring 99 on Metacritic — and GULF FIGHT WIDENS — Iran hits a US base
-in Kuwait and strikes Bahrain again.
+Second row: ANTHROPIC DEBUTS ON NASDAQ — ANT opens at $111.50, up 34%
+on the $83 IPO price, after a record $81.3B raise valuing the Claude
+maker at about $1.5 trillion; and GULF WAR WIDENS — Iran hits US bases
+in Kuwait and Bahrain, tankers are struck off Oman, and USS Theodore
+Roosevelt joins two carriers already in theatre.
 
-Footer, ALSO TODAY: the ICJ rules on the Myanmar genocide case; Jeffries
-is nominated for Speaker, a first; Nvidia's Kress promises earlier raises
-and halts H chips to China; the Fed points to more hikes; the EU proposes
-a 45B euro Ukraine loan; Cyclone Akvan nears the India coast; Voyager 1
-reaches one light-day.
+Third row: COP31 DRAFT DROPS FOSSIL FUELS — the Antalya text omits the
+fossil-fuel phaseout as talks run into their final night; and EISENKOT
+MOVES TO OUST NETANYAHU — his bloc vows an emergency government while
+Netanyahu's unity-government offer is called a "bluff".
+
+Footer, ALSO TODAY: GTA VI launches worldwide (99 Metacritic); the ICJ
+rules on the Myanmar genocide case; Jeffries is nominated for Speaker;
+Nvidia's Kress promises earlier raises and halts H chips to China; the
+Fed points to more hikes; the EU proposes a 45B euro Ukraine loan;
+Cyclone Akvan nears India; Voyager 1 reaches one light-day.
 
 This script validates entry.png (JPEG markers, size, and dimensions) and
 copies it byte-identically to the output directory.
@@ -72,7 +81,10 @@ def jpeg_dimensions(data):
 
 
 def validate(data, label):
-    """Validate JPEG bytes: SOI/EOI markers, size, and 1024x1024 dimensions."""
+    """Validate JPEG bytes: SOI/EOI markers, size, and 1024x1024 dimensions.
+
+    v2 entry image: 355,937 bytes, sha256 76510899... (see README.md).
+    """
     if len(data) < 4:
         fail(label + ": file too small to be a JPEG")
     if data[0] != 0xFF or data[1] != 0xD8:

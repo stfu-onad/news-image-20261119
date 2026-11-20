@@ -1,141 +1,116 @@
-"""THE WORLD TODAY — Thursday 19 November 2026 (v2, FINAL EDITION).
+"""Front page for 19 November 2026, final edition (v2).
 
-Front page of a one-page newspaper image (entry.png, 1024x1024 JPEG),
-revised after the day's news was complete. Five stories, each verified
-against reporting of 19 November 2026:
+The shipped file is a 1024x1024 JPEG newspaper page, "THE WORLD TODAY",
+dated Thursday 19 November 2026. Its five picture stories, all checked
+against the day's reporting: the Shenzhen summit ends with a four-point
+Declaration Towards Peace from Trump, Xi and Putin; Anthropic's shares
+begin trading on Nasdaq as ANT after the biggest IPO ever; the Gulf war
+widens as Iran strikes US bases in Kuwait and Bahrain; the COP31 draft
+in Antalya drops the fossil-fuel phaseout; and Eisenkot's bloc presses
+to replace Netanyahu. A footer strip rounds up the rest of the day.
 
-Lead: TRUMP, XI AND PUTIN SIGN 'DECLARATION TOWARDS PEACE' — the
-trilateral summit in Shenzhen ends with a four-point pact on UN reform,
-oil output, ICC limits and nuclear risk; no deal on Ukraine or Gaza.
-
-Second row: ANTHROPIC DEBUTS ON NASDAQ — ANT opens at $111.50, up 34%
-on the $83 IPO price, after a record $81.3B raise valuing the Claude
-maker at about $1.5 trillion; and GULF WAR WIDENS — Iran hits US bases
-in Kuwait and Bahrain, tankers are struck off Oman, and USS Theodore
-Roosevelt joins two carriers already in theatre.
-
-Third row: COP31 DRAFT DROPS FOSSIL FUELS — the Antalya text omits the
-fossil-fuel phaseout as talks run into their final night; and EISENKOT
-MOVES TO OUST NETANYAHU — his bloc vows an emergency government while
-Netanyahu's unity-government offer is called a "bluff".
-
-Footer, ALSO TODAY: GTA VI launches worldwide (99 Metacritic); the ICJ
-rules on the Myanmar genocide case; Jeffries is nominated for Speaker;
-Nvidia's Kress promises earlier raises and halts H chips to China; the
-Fed points to more hikes; the EU proposes a 45B euro Ukraine loan;
-Cyclone Akvan nears India; Voyager 1 reaches one light-day.
-
-This script validates entry.png (JPEG markers, size, and dimensions) and
-copies it byte-identically to the output directory.
+Running this program checks the page (JPEG start/end markers, the
+one-mebibyte cap, exact 1024x1024 frame size) and writes an unchanged
+copy to the output directory. It needs nothing beyond the standard
+library and never uses the network.
 """
 
 import os
 import struct
 import sys
 
-EXPECTED_WIDTH = 1024
-EXPECTED_HEIGHT = 1024
-MAX_SIZE = 1_048_576  # 1 MiB
+PAGE_W = 1024
+PAGE_H = 1024
+PAGE_MAX = 1_048_576
+PAGE_FILE = "entry.png"
+# v2 image: 355,937 bytes, sha256 76510899ad9e9e258291c7ed0d7d1a7ca3c2ac7701aa07551057cfe04895b9f7
 
-SOURCE_NAME = "entry.png"
-
-
-def fail(message):
-    """Print an error to stderr and exit non-zero."""
-    print("error: " + message, file=sys.stderr)
-    sys.exit(1)
+SOI = b"\xff\xd8"
+EOI = b"\xff\xd9"
 
 
-def jpeg_dimensions(data):
-    """Return (width, height) parsed from the first SOF segment (C0/C1/C2).
+def abort(text):
+    sys.stderr.write("error: %s\n" % text)
+    raise SystemExit(1)
 
-    Returns None when no SOF segment is found before the scan data.
-    """
-    if len(data) < 4 or data[0] != 0xFF or data[1] != 0xD8:
+
+def frame_size(blob):
+    """Return the (width, height) from the first JPEG frame header."""
+    if blob[:2] != SOI:
         return None
-    i = 2
-    while i + 1 < len(data):
-        if data[i] != 0xFF:
+    pos = 2
+    while pos + 1 < len(blob):
+        if blob[pos] != 0xFF:
             return None
-        marker = data[i + 1]
-        if marker == 0xDA:  # SOS: scan data follows, no SOF after this
+        tag = blob[pos + 1]
+        if tag == 0xDA or tag == 0xD9:
             return None
-        if marker == 0xD9:  # EOI
-            return None
-        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
-            i += 2
+        if tag == 0x01 or 0xD0 <= tag <= 0xD7:
+            pos += 2
             continue
-        if i + 4 > len(data):
+        if pos + 4 > len(blob):
             return None
-        length = struct.unpack(">H", data[i + 2:i + 4])[0]
-        if length < 2 or i + 2 + length > len(data):
+        seg = struct.unpack_from(">H", blob, pos + 2)[0]
+        if seg < 2 or pos + 2 + seg > len(blob):
             return None
-        if marker in (0xC0, 0xC1, 0xC2):
-            if length < 7:
+        if tag in (0xC0, 0xC1, 0xC2):
+            if seg < 7:
                 return None
-            height = struct.unpack(">H", data[i + 5:i + 7])[0]
-            width = struct.unpack(">H", data[i + 7:i + 9])[0]
-            return (width, height)
-        i += 2 + length
+            h = struct.unpack_from(">H", blob, pos + 5)[0]
+            w = struct.unpack_from(">H", blob, pos + 7)[0]
+            return (w, h)
+        pos += 2 + seg
     return None
 
 
-def validate(data, label):
-    """Validate JPEG bytes: SOI/EOI markers, size, and 1024x1024 dimensions.
-
-    v2 entry image: 355,937 bytes, sha256 76510899... (see README.md).
-    """
-    if len(data) < 4:
-        fail(label + ": file too small to be a JPEG")
-    if data[0] != 0xFF or data[1] != 0xD8:
-        fail(label + ": missing JPEG SOI marker (FF D8)")
-    if data[-2] != 0xFF or data[-1] != 0xD9:
-        fail(label + ": missing JPEG EOI marker (FF D9)")
-    if len(data) > MAX_SIZE:
-        fail(label + ": size %d exceeds %d bytes" % (len(data), MAX_SIZE))
-    dims = jpeg_dimensions(data)
-    if dims is None:
-        fail(label + ": no SOF segment found")
-    if dims != (EXPECTED_WIDTH, EXPECTED_HEIGHT):
-        fail(label + ": dimensions %dx%d, expected %dx%d"
-             % (dims[0], dims[1], EXPECTED_WIDTH, EXPECTED_HEIGHT))
-    return dims
+def check(blob, where):
+    """Refuse anything that is not a 1024x1024 JPEG under the size cap."""
+    if len(blob) < 4:
+        abort("%s is too short to be a JPEG" % where)
+    if blob[:2] != SOI:
+        abort("%s does not start with a JPEG SOI marker" % where)
+    if blob[-2:] != EOI:
+        abort("%s does not end with a JPEG EOI marker" % where)
+    if len(blob) > PAGE_MAX:
+        abort("%s is %d bytes, over the %d-byte limit"
+              % (where, len(blob), PAGE_MAX))
+    size = frame_size(blob)
+    if size is None:
+        abort("%s has no JPEG frame header" % where)
+    if size != (PAGE_W, PAGE_H):
+        abort("%s is %dx%d, expected %dx%d"
+              % (where, size[0], size[1], PAGE_W, PAGE_H))
+    return size
 
 
-def main():
-    here = os.path.dirname(os.path.abspath(__file__))
-    source_path = os.path.join(here, SOURCE_NAME)
-    output_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    output_path = os.path.join(output_dir, SOURCE_NAME)
-
+def run():
+    base = os.path.dirname(os.path.abspath(__file__))
+    src = os.path.join(base, PAGE_FILE)
+    dest_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
+    dest = os.path.join(dest_dir, PAGE_FILE)
     try:
-        with open(source_path, "rb") as f:
-            data = f.read()
+        with open(src, "rb") as handle:
+            blob = handle.read()
     except OSError as exc:
-        fail("cannot read %s: %s" % (source_path, exc))
-
-    validate(data, SOURCE_NAME)
-
+        abort("cannot open %s: %s" % (src, exc))
+    check(blob, PAGE_FILE)
     try:
-        os.makedirs(output_dir, exist_ok=True)
-        with open(output_path, "wb") as f:
-            f.write(data)
+        os.makedirs(dest_dir, exist_ok=True)
+        with open(dest, "wb") as handle:
+            handle.write(blob)
     except OSError as exc:
-        fail("cannot write %s: %s" % (output_path, exc))
-
+        abort("cannot write %s: %s" % (dest, exc))
     try:
-        with open(output_path, "rb") as f:
-            copied = f.read()
+        with open(dest, "rb") as handle:
+            again = handle.read()
     except OSError as exc:
-        fail("cannot re-read %s: %s" % (output_path, exc))
-
-    if copied != data:
-        fail(output_path + ": copied bytes differ from source")
-    validate(copied, output_path)
-
-    print("entry.png: %d bytes, %dx%d JPEG, copied byte-identically to %s"
-          % (len(data), EXPECTED_WIDTH, EXPECTED_HEIGHT, output_path))
+        abort("cannot re-open %s: %s" % (dest, exc))
+    if again != blob:
+        abort("%s changed during the copy" % dest)
+    check(again, dest)
+    print("%s: %d bytes, %dx%d JPEG, copied unchanged to %s"
+          % (PAGE_FILE, len(blob), PAGE_W, PAGE_H, dest))
 
 
 if __name__ == "__main__":
-    main()
+    run()
